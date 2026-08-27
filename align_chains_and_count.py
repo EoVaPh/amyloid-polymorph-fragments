@@ -9,6 +9,8 @@ from typing import List, Tuple, Sequence
 
 from scipy.stats import linregress
 
+from collections import defaultdict
+
 from matplotlib import pyplot as plot
 import matplotlib
 
@@ -60,23 +62,23 @@ def read_families(file_path: str) -> dict:
     current_family = None
 
     with open(file_path, 'r', encoding='utf-8') as file:
-    
+
             for line in file:
                 line = line.strip()
-    
+
                 if not line:
                     continue
-    
+
                 if line.startswith('>'):
                     current_family = line[1:].strip()
                     families[current_family] = []
-    
+
                 elif current_family is not None:
                     pdbid = line.lower()
-    
+
                     if pdbid not in families[current_family]:
                         families[current_family].append(pdbid)
-    
+
     return families
 
 
@@ -443,7 +445,6 @@ def find_mismatches(aligned_chain_1: str, aligned_chain_2: str) -> str:
     return mismatches
 
 
-
 families = read_families('amyloid_explorer_families.txt')
 
 lddt_data = read_pair_values_file('lddts.txt')
@@ -638,12 +639,12 @@ for family_number, (family_name, pdb_ids) in enumerate(
 
             seqres_idr_1 = read_seqres_idr(
                 pdbid_1,
-                'idrs.txt'
+                'Ps.txt'#'idrs.txt'
             )
 
             seqres_idr_2 = read_seqres_idr(
                 pdbid_2,
-                'idrs.txt'
+                'Ps.txt'#'idrs.txt'
             )
 
             chain_idr_1 = select_atomseq_idr(
@@ -710,17 +711,17 @@ for family_number, (family_name, pdb_ids) in enumerate(
                     idr_1 = idr_by_position_1[pos_1]
                     idr_2 = idr_by_position_2[pos_2]
 
-                    mean_idr_residue = (
-                        idr_1 + idr_2
-                    ) / 2
+                    mean_idr_residue = idr_1 + idr_2#(
+                        #idr_1 + idr_2
+                    #) / 2
 
                     window_pair_idr.append(
                         mean_idr_residue
                     )
 
-                mean_idr_window = np.mean(
-                    window_pair_idr
-                )
+                mean_idr_window = round(sum(window_pair_idr))#np.mean(
+                    #window_pair_idr
+                #)
 
                 idr_length_6.append(
                     mean_idr_window
@@ -752,39 +753,55 @@ for family_number, (family_name, pdb_ids) in enumerate(
     # IDR vs LDDT
     # ========================================================
 
-    slope, intercept, r, p, se = linregress(
-        idr_length_6,
-        lddt_length_6
-    )
+    if len(set(idr_length_6)) > 1:
+        slope, intercept, r, p, se = linregress(
+            idr_length_6,
+            lddt_length_6
+        )
 
-    idr_range = np.arange(
-        min(idr_length_6),
-        max(idr_length_6),
-        0.01
-    )
+        idr_range = np.arange(
+            min(idr_length_6),
+            max(idr_length_6),
+            0.01
+        )
+
+        plot.plot(
+            idr_range,
+            intercept + slope * idr_range,
+            color='#450920'
+        )
 
     figure = plot.figure(
         figsize=(8, 6)
     )
 
-    plot.plot(
-        idr_range,
-        intercept + slope * idr_range,
-        color='#450920'
-    )
+    #plot.scatter(
+    #    np.array(idr_length_6, dtype=float) + np.random.uniform(-0.02, +0.02, size=len(idr_length_6)),
+    #    lddt_length_6,
+    #    color='#a53860',
+    #    alpha=0.1
+    #)
 
-    plot.scatter(
-        idr_length_6,
-        lddt_length_6,
-        color='#a53860',
-        alpha=0.1
-    )
+    x, y = idr_length_6, lddt_length_6
+
+    # Group y values by x
+    groups = defaultdict(list)
+    for xi, yi in zip(x, y):
+        groups[xi].append(yi)
+
+    # Sort x values and build boxplot data in that order
+    xs = sorted(groups)
+    data = [groups[xi] for xi in xs]
+
+    plot.boxplot(data, positions=range(len(xs)))
+    plot.xticks(range(len(xs)))
+    #plot.xticklabels(xs)
 
     plot.xticks(fontsize=12)
     plot.yticks(fontsize=12)
 
     plot.xlabel(
-        'IDR',
+        'Number of glycines',#'IDR',
         fontsize=16
     )
 
@@ -811,39 +828,55 @@ for family_number, (family_name, pdb_ids) in enumerate(
     # IDR vs RMSD
     # ========================================================
 
-    slope, intercept, r, p, se = linregress(
-        idr_length_6,
-        rmsd_length_6
-    )
+    if len(set(idr_length_6)) > 1:
+        slope, intercept, r, p, se = linregress(
+            idr_length_6,
+            rmsd_length_6
+        )
 
-    idr_range = np.arange(
-        min(idr_length_6),
-        max(idr_length_6),
-        0.01
-    )
+        idr_range = np.arange(
+            min(idr_length_6),
+            max(idr_length_6),
+            0.01
+        )
+
+        plot.plot(
+            idr_range,
+            intercept + slope * idr_range,
+            color='#450920'
+        )
 
     figure = plot.figure(
         figsize=(8, 6)
     )
 
-    plot.plot(
-        idr_range,
-        intercept + slope * idr_range,
-        color='#450920'
-    )
+    #plot.scatter(
+    #    np.array(idr_length_6, dtype=float) + np.random.uniform(-0.02, +0.02, size=len(idr_length_6)),
+    #    rmsd_length_6,
+    #    color='#a53860',
+    #    alpha=0.1
+    #)
 
-    plot.scatter(
-        idr_length_6,
-        rmsd_length_6,
-        color='#a53860',
-        alpha=0.1
-    )
+    x, y = idr_length_6, rmsd_length_6
+
+    # Group y values by x
+    groups = defaultdict(list)
+    for xi, yi in zip(x, y):
+        groups[xi].append(yi)
+
+    # Sort x values and build boxplot data in that order
+    xs = sorted(groups)
+    data = [groups[xi] for xi in xs]
+
+    plot.boxplot(data, positions=range(len(xs)))
+    plot.xticks(range(len(xs)))
+    #plot.xticklabels(xs)
 
     plot.xticks(fontsize=12)
     plot.yticks(fontsize=12)
 
     plot.xlabel(
-        'IDR',
+        'Number of glycines',#'IDR',
         fontsize=16
     )
 
