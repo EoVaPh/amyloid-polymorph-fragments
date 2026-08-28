@@ -142,30 +142,27 @@ def find_core(alignment, threshold=0.875):
 
 alignment_folder = Path('MAFFT_seqres_from_cifs_multiple_alignment')
 alignment_files = sorted(alignment_folder.rglob("*.txt"))
+output_file = Path("cores.txt")
 count = 0
 
+with open(output_file, "w", encoding="utf-8") as out:
+    for alignment_file in alignment_files:
+        alignment = read_alignment(alignment_file)
+        core_positions = find_core(alignment, threshold=0.93)
 
-for alignment_file in alignment_files:
-    alignment = read_alignment(alignment_file)
-    core_positions = find_core(alignment, threshold=0.93)
+        if not core_positions:
+            print(f"{alignment_file.name}: core not found")
+            count += 1
+            continue
 
-    if not core_positions:
-        print(f"{alignment_file.name}: core not found")
-        count += 1
-        continue
+        # Take the sequence of the first structure
+        # to represent the core.
+        reference_sequence = alignment[0][1]
+        core = "".join(reference_sequence[position] for position in core_positions)
 
-    # Take the sequence of the first structure
-    # to represent the core.
-    reference_sequence = alignment[0][1]
-    core = "".join(reference_sequence[position] for position in core_positions)
+        family_name = alignment_file.stem
 
-    family_name = alignment_file.stem
-
-    print(f"{family_name}:")
-    print(f"  core = {core}")
-    print(f"  length = {len(core)}")
-    print(f"  alignment positions = "
-          f"{core_positions[0]}-{core_positions[-1]}")
-    print()
+        out.write(f">{family_name}\n"
+                  f"{core}\n")
 
 print(f'For {count} families core was not found')
