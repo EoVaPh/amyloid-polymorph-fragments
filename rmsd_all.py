@@ -7,7 +7,7 @@ from Bio.Align import PairwiseAligner
 
 
 input_folder = Path('extracted_chains')
-families_file = Path('amyloid_explorer_families.txt')
+families_file = Path('clusters_renamed.txt')
 output_file = Path('rmsds.txt')
 
 

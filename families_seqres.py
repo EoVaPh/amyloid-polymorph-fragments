@@ -3,9 +3,9 @@ from Bio import SeqIO
 
 
 fasta_file = Path("all_seqres_from_cifs.txt")
-families_file = Path("amyloid_explorer_families.txt")
+families_file = Path("clusters_renamed.txt")
 
-output_folder = Path("families_seqres_from_cifs")
+output_folder = Path("clusters_seqres")
 output_folder.mkdir(exist_ok=True)
 
 
@@ -26,7 +26,7 @@ with open(families_file, "r", encoding="utf-8") as file:
             families[current_family] = []
 
         else:
-            families[current_family].append(line)
+            families[current_family].append(line[:4])
 
 records = list(SeqIO.parse(fasta_file, "fasta"))
 
