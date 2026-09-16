@@ -317,46 +317,24 @@ def get_shared_regions(w: int, aligned_chain_1: str, aligned_chain_2: str,
 
 
 
-def normalize_pair(
-    pdbid_1: str,
-    pdbid_2: str
-) -> tuple:
-    """
-    Make pair independent of structure order.
+def normalize_pair(pdbid_1: str, pdbid_2: str) -> tuple:
+    '''Make pair independent of structure order.
+    12gb_2lmn and 2lmn_12gb become the same pair.'''
 
-    12gb_2lmn and 2lmn_12gb become the same pair.
-    """
-
-    return tuple(sorted((
-        pdbid_1.lower(),
-        pdbid_2.lower()
-    )))
+    return tuple(sorted((pdbid_1.lower(), pdbid_2.lower())))
 
 
 def read_pair_values_file(file_path: str) -> dict:
-    """
-    Read file of the form:
+    '''Read file of the form:
 
     >Family
     pdbid1_pdbid2
-    value1 value2 value3 ...
-
-    Returns:
-
-    {
-        ('pdbid1', 'pdbid2'): [value1, value2, ...],
-        ...
-    }
-    """
+    value1 value2 value3 ...'''
 
     values_by_pair = {}
 
     with open(file_path, 'r', encoding='utf-8') as file:
-        lines = [
-            line.strip()
-            for line in file
-            if line.strip()
-        ]
+        lines = [line.strip() for line in file if line.strip()]
 
     i = 0
 
@@ -369,22 +347,12 @@ def read_pair_values_file(file_path: str) -> dict:
         pair_name = lines[i]
 
         if i + 1 >= len(lines):
-            raise ValueError(
-                f'No values found for pair {pair_name}'
-            )
+            raise ValueError(f'No values found for pair {pair_name}')
 
-        values = [
-            float(x)
-            for x in lines[i + 1].split()
-        ]
+        values = [float(x) for x in lines[i + 1].split()]
 
         pdbid_1, pdbid_2 = pair_name.split('_', 1)
-
-        pair_key = normalize_pair(
-            pdbid_1,
-            pdbid_2
-        )
-
+        pair_key = normalize_pair(pdbid_1, pdbid_2)
         values_by_pair[pair_key] = values
 
         i += 2
@@ -447,46 +415,30 @@ def find_mismatches(aligned_chain_1: str, aligned_chain_2: str) -> str:
 
 families = read_families('clusters_renamed.txt')
 
-lddt_data = read_pair_values_file('lddts.txt')
-rmsd_data = read_pair_values_file('rmsds.txt')
+lddt_data = read_pair_values_file('lddts_9.txt')
+rmsd_data = read_pair_values_file('rmsds_9.txt')
 
 verbose = False
 
-output_dir = Path('idr_lddt_rmsd_graphics_2')
+output_dir = Path('idr_lddt_rmsd_graphics_try')
 output_dir.mkdir(exist_ok=True)
 
-for family_number, (family_name, pdb_ids) in enumerate(
-    families.items(),
-    start=1
-):
+for family_number, (family_name, pdb_ids) in enumerate(families.items(), start=1):
 
     print()
     print('=' * 80)
-    print(
-        f'[{family_number}/{len(families)}] {family_name}'
-    )
-    print(
-        f'Structures: {len(pdb_ids)}'
-    )
+    print(f'[{family_number}/{len(families)}] {family_name}')
+    print(f'Structures: {len(pdb_ids)}')
     print('=' * 80)
-
-    # --------------------------------------------------------
-    # Arrays for current family
-    # --------------------------------------------------------
 
     rmsd_length_6 = []
     lddt_length_6 = []
     idr_length_6 = []
 
-    # --------------------------------------------------------
-    # All unique pairs in this family
-    # --------------------------------------------------------
-
     total_pairs = len(pdb_ids) * (len(pdb_ids) - 1) // 2
     pair_counter = 0
 
     for pdbid_1 in pdb_ids:
-
         for pdbid_2 in pdb_ids:
 
             if pdbid_1 >= pdbid_2:
@@ -494,63 +446,30 @@ for family_number, (family_name, pdb_ids) in enumerate(
 
             pair_counter += 1
 
-            print(
-                f'[{pair_counter}/{total_pairs}] '
-                f'{pdbid_1} / {pdbid_2}'
-            )
+            print(f'[{pair_counter}/{total_pairs}] '
+                  f'{pdbid_1} / {pdbid_2}')
 
-            # ------------------------------------------------
-            # Get precalculated LDDT and RMSD
-            # ------------------------------------------------
-
-            pair_key = normalize_pair(
-                pdbid_1,
-                pdbid_2
-            )
+            pair_key = normalize_pair(pdbid_1, pdbid_2)
 
             if pair_key not in lddt_data:
-                print(
-                    f'  WARNING: LDDT not found for '
-                    f'{pdbid_1} / {pdbid_2}'
-                )
+                print(f'  WARNING: LDDT not found for '
+                      f'{pdbid_1} / {pdbid_2}')
                 continue
 
             if pair_key not in rmsd_data:
-                print(
-                    f'  WARNING: RMSD not found for '
-                    f'{pdbid_1} / {pdbid_2}'
-                )
+                print(f'  WARNING: RMSD not found for '
+                      f'{pdbid_1} / {pdbid_2}')
                 continue
 
             pair_lddt = lddt_data[pair_key]
             pair_rmsd = rmsd_data[pair_key]
 
-            # ------------------------------------------------
-            # Alignment
-            # ------------------------------------------------
-
-            results = process_pair(
-                pdbid_1,
-                pdbid_2
-            )
-
-            aligned_chain_1, aligned_chain_2 = strip_alignment(
-                results['chain_alignment'][0],
-                results['chain_alignment'][1]
-            )
-
-            len_longest_shared_region = \
-                get_len_longest_shared_region(
-                    aligned_chain_1,
-                    aligned_chain_2
-                )
+            results = process_pair(pdbid_1, pdbid_2)
+            aligned_chain_1, aligned_chain_2 = strip_alignment(results['chain_alignment'][0], results['chain_alignment'][1])
+            len_longest_shared_region = get_len_longest_shared_region(aligned_chain_1, aligned_chain_2)
 
             if len_longest_shared_region < 7:
                 continue
-
-            # ------------------------------------------------
-            # Verbose output
-            # ------------------------------------------------
 
             if verbose:
 
@@ -577,177 +496,56 @@ for family_number, (family_name, pdb_ids) in enumerate(
             print()
             print(aligned_chain_1)
             print(aligned_chain_2)
-            print(
-                find_mismatches(
-                    aligned_chain_1,
-                    aligned_chain_2
-                )
-            )
+            print(find_mismatches(aligned_chain_1, aligned_chain_2))
             print()
-
-            # ------------------------------------------------
-            # Coordinates
-            # ------------------------------------------------
 
             positions_1 = get_positions(pdbid_1)
             positions_2 = get_positions(pdbid_2)
-
-            # ------------------------------------------------
-            # Shared windows
-            # ------------------------------------------------
-
-            (
-                aa_regions_1,
-                pos_regions_1,
-                aa_regions_2,
-                pos_regions_2
-            ) = get_shared_regions(
-                6,
-                aligned_chain_1,
-                aligned_chain_2,
-                positions_1,
-                positions_2
-            )
-
-            # ------------------------------------------------
-            # Check number of windows
-            # ------------------------------------------------
+            aa_regions_1, pos_regions_1, aa_regions_2, pos_regions_2 = get_shared_regions(6, aligned_chain_1, aligned_chain_2, positions_1, positions_2)
 
             if len(pair_lddt) != len(pos_regions_1):
-
-                print(
-                    f'WARNING: LDDT/window mismatch: '
-                    f'{len(pair_lddt)} vs '
-                    f'{len(pos_regions_1)}'
-                )
-
+                print(f'WARNING: LDDT/window mismatch: '
+                      f'{len(pair_lddt)} vs '
+                      f'{len(pos_regions_1)}')
                 continue
 
             if len(pair_rmsd) != len(pos_regions_1):
-
-                print(
-                    f'WARNING: RMSD/window mismatch: '
-                    f'{len(pair_rmsd)} vs '
-                    f'{len(pos_regions_1)}'
-                )
-
+                print(f'WARNING: RMSD/window mismatch: '
+                      f'{len(pair_rmsd)} vs '
+                      f'{len(pos_regions_1)}')
                 continue
 
-            # ------------------------------------------------
-            # IDR
-            # ------------------------------------------------
+            seqres_idr_1 = read_seqres_idr(pdbid_1, 'idrs.txt')
+            seqres_idr_2 = read_seqres_idr(pdbid_2, 'idrs.txt')
 
-            seqres_idr_1 = read_seqres_idr(
-                pdbid_1,
-                'idrs.txt'#'idrs.txt'
-            )
+            chain_idr_1 = select_atomseq_idr(results['chain_1'][0], results['chain_1'][1], seqres_idr_1)
+            chain_idr_2 = select_atomseq_idr(results['chain_2'][0], results['chain_2'][1], seqres_idr_2)
 
-            seqres_idr_2 = read_seqres_idr(
-                pdbid_2,
-                'idrs.txt'#'idrs.txt'
-            )
+            idr_by_position_1 = dict(zip(positions_1, chain_idr_1))
+            idr_by_position_2 = dict(zip(positions_2, chain_idr_2))
 
-            chain_idr_1 = select_atomseq_idr(
-                results['chain_1'][0],
-                results['chain_1'][1],
-                seqres_idr_1
-            )
+            for r in range(len(pos_regions_1)):
 
-            chain_idr_2 = select_atomseq_idr(
-                results['chain_2'][0],
-                results['chain_2'][1],
-                seqres_idr_2
-            )
-
-            idr_by_position_1 = dict(
-                zip(
-                    positions_1,
-                    chain_idr_1
-                )
-            )
-
-            idr_by_position_2 = dict(
-                zip(
-                    positions_2,
-                    chain_idr_2
-                )
-            )
-
-            # ------------------------------------------------
-            # Process windows
-            # ------------------------------------------------
-
-            for r in range(
-                len(pos_regions_1)
-            ):
-
-                # --------------------------------------------
-                # RMSD from file
-                # --------------------------------------------
-
-                rmsd_length_6.append(
-                    pair_rmsd[r]
-                )
-
-                # --------------------------------------------
-                # LDDT from file
-                # --------------------------------------------
-
-                lddt_length_6.append(
-                    1 - pair_lddt[r]
-                )
-
-                # --------------------------------------------
-                # IDR
-                # --------------------------------------------
-
+                rmsd_length_6.append(pair_rmsd[r])
+                lddt_length_6.append(1 - pair_lddt[r])
                 window_pair_idr = []
 
-                for pos_1, pos_2 in zip(
-                    pos_regions_1[r],
-                    pos_regions_2[r]
-                ):
+                for pos_1, pos_2 in zip(pos_regions_1[r], pos_regions_2[r]):
 
                     idr_1 = idr_by_position_1[pos_1]
                     idr_2 = idr_by_position_2[pos_2]
 
-                    mean_idr_residue = (
-                        idr_1 + idr_2
-                    ) / 2
+                    mean_idr_residue = (idr_1 + idr_2) / 2
+                    window_pair_idr.append(mean_idr_residue)
 
-                    window_pair_idr.append(
-                        mean_idr_residue
-                    )
-
-                mean_idr_window = np.mean(
-                    window_pair_idr
-                )
-
-                idr_length_6.append(
-                    mean_idr_window
-                )
-
-    # ========================================================
-    # PLOTS FOR CURRENT FAMILY
-    # ========================================================
+                mean_idr_window = np.mean(window_pair_idr)
+                idr_length_6.append(mean_idr_window)
 
     if len(idr_length_6) < 2:
-
-        print(
-            'Not enough data to build graphs.'
-        )
-
+        print('Not enough data to build graphs.')
         continue
 
-    # --------------------------------------------------------
-    # Family filename
-    # --------------------------------------------------------
-
-    safe_family_name = ''.join(
-        c if c.isalnum() or c in '-_.'
-        else '_'
-        for c in family_name
-    )
+    safe_family_name = ''.join(c if c.isalnum() or c in '-_.' else '_' for c in family_name)
 
     # IDR vs LDDT
     slope, intercept, r, p, se = linregress(idr_length_6, lddt_length_6)
