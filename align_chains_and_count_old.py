@@ -420,7 +420,7 @@ rmsd_data = read_pair_values_file('rmsds.txt')
 
 verbose = False
 
-output_dir = Path('idr_lddt_rmsd_graphics_try')
+output_dir = Path('idr_lddt_rmsd_graphics_2')
 output_dir.mkdir(exist_ok=True)
 
 for family_number, (family_name, pdb_ids) in enumerate(families.items(), start=1):
