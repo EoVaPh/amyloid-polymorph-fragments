@@ -415,8 +415,8 @@ def find_mismatches(aligned_chain_1: str, aligned_chain_2: str) -> str:
 
 families = read_families('clusters_renamed.txt')
 
-lddt_data = read_pair_values_file('lddts_9.txt')
-rmsd_data = read_pair_values_file('rmsds_9.txt')
+lddt_data = read_pair_values_file('lddts.txt')
+rmsd_data = read_pair_values_file('rmsds.txt')
 
 verbose = False
 
