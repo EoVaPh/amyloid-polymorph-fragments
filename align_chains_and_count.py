@@ -199,7 +199,12 @@ def process_pair(pdbid_1: str, pdbid_2: str) -> dict:
         ),
 
         'chain_1_to_seqres': chain_1_to_seqres,
-        'chain_2_to_seqres': chain_2_to_seqres
+        'chain_2_to_seqres': chain_2_to_seqres,
+
+        'seqres_to_common': (
+            seqres_1_to_common,
+            seqres_2_to_common
+        )
     }
 
 
@@ -274,10 +279,14 @@ def num_substitutions(seq_1: str, seq_2: str) -> int:
     return count
 
 
-def get_shared_regions(w: int, aligned_chain_1: str, aligned_chain_2: str,
-                               positions_1: list, positions_2: list) -> tuple:
-    '''Find all shared continuous regions of the same length and return their
-       sequences and coordinates.'''
+def get_shared_regions(
+        w: int,
+        aligned_chain_1: str,
+        aligned_chain_2: str,
+        positions_1: list,
+        positions_2: list,
+        seqres_1_to_common: dict,
+        seqres_2_to_common: dict):
 
     assert len(aligned_chain_1) == len(aligned_chain_2)
 
@@ -285,78 +294,147 @@ def get_shared_regions(w: int, aligned_chain_1: str, aligned_chain_2: str,
 
     i_1, i_2 = -1, -1
 
-    aa_regions_1, pos_regions_1, aa_regions_2, pos_regions_2 = [], [], [], []
+    aa_regions_1 = []
+    pos_regions_1 = []
+    aa_regions_2 = []
+    pos_regions_2 = []
 
-    for i in range(6, N - w + 1 - 6):
+    seqres_windows_1 = []
+    seqres_windows_2 = []
+
+    # Invert SEQRES -> common alignment mappings
+    common_to_seqres_1 = {
+        common: seqres
+        for seqres, common in seqres_1_to_common.items()
+    }
+
+    common_to_seqres_2 = {
+        common: seqres
+        for seqres, common in seqres_2_to_common.items()
+    }
+
+    for i in range(9, N - w + 1 - 9):
+
         if aligned_chain_1[i] != '-':
             i_1 += 1
 
         if aligned_chain_2[i] != '-':
             i_2 += 1
 
-        region_sequence_1, region_positions_1 = [], []
-        region_sequence_2, region_positions_2 = [], []
+        region_sequence_1 = []
+        region_positions_1 = []
+
+        region_sequence_2 = []
+        region_positions_2 = []
+
+        region_seqres_1 = []
+        region_seqres_2 = []
+
+        valid = True
 
         for j in range(w):
-            if aligned_chain_1[i + j] != '-' and aligned_chain_2[i + j] != '-':
-                region_sequence_1 += aligned_chain_1[i + j]
-                region_positions_1.append(positions_1[i_1 + j])
-                region_sequence_2 += aligned_chain_2[i + j]
-                region_positions_2.append(positions_2[i_2 + j])
-            else:
+
+            alignment_position = i + j
+
+            if (
+                aligned_chain_1[alignment_position] == '-' or
+                aligned_chain_2[alignment_position] == '-'
+            ):
+                valid = False
                 break
 
-        if len(region_sequence_1) == w:
-            if num_substitutions(region_sequence_1, region_sequence_2) <= 0:
-                aa_regions_1.append(region_sequence_1)
-                pos_regions_1.append(region_positions_1)
-                aa_regions_2.append(region_sequence_2)
-                pos_regions_2.append(region_positions_2)
+            region_sequence_1.append(
+                aligned_chain_1[alignment_position]
+            )
+            region_positions_1.append(
+                positions_1[i_1 + j]
+            )
 
-    return aa_regions_1, pos_regions_1, aa_regions_2, pos_regions_2
+            region_sequence_2.append(
+                aligned_chain_2[alignment_position]
+            )
+            region_positions_2.append(
+                positions_2[i_2 + j]
+            )
+
+            if alignment_position not in common_to_seqres_1:
+                valid = False
+                break
+
+            if alignment_position not in common_to_seqres_2:
+                valid = False
+                break
+
+            region_seqres_1.append(
+                common_to_seqres_1[alignment_position]
+            )
+            region_seqres_2.append(
+                common_to_seqres_2[alignment_position]
+            )
+
+        if not valid:
+            continue
+
+        if len(region_sequence_1) != w:
+            continue
+
+        if num_substitutions(
+            region_sequence_1,
+            region_sequence_2
+        ) > 0:
+            continue
+
+        # Make sure the SEQRES positions form a
+        # continuous window of length w.
+        if region_seqres_1 != list(
+            range(region_seqres_1[0],
+                  region_seqres_1[0] + w)
+        ):
+            continue
+
+        if region_seqres_2 != list(
+            range(region_seqres_2[0],
+                  region_seqres_2[0] + w)
+        ):
+            continue
+
+        aa_regions_1.append(region_sequence_1)
+        pos_regions_1.append(region_positions_1)
+
+        aa_regions_2.append(region_sequence_2)
+        pos_regions_2.append(region_positions_2)
+
+        seqres_windows_1.append(region_seqres_1)
+        seqres_windows_2.append(region_seqres_2)
+
+    return (
+        aa_regions_1,
+        pos_regions_1,
+        aa_regions_2,
+        pos_regions_2,
+        seqres_windows_1,
+        seqres_windows_2
+    )
 
 
+def normalize_pair(pdbid_1: str, pdbid_2: str) -> tuple:
+    '''Make pair independent of structure order.
+    12gb_2lmn and 2lmn_12gb become the same pair.'''
 
-def normalize_pair(
-    pdbid_1: str,
-    pdbid_2: str
-) -> tuple:
-    """
-    Make pair independent of structure order.
-
-    12gb_2lmn and 2lmn_12gb become the same pair.
-    """
-
-    return tuple(sorted((
-        pdbid_1.lower(),
-        pdbid_2.lower()
-    )))
+    return tuple(sorted((pdbid_1.lower(), pdbid_2.lower())))
 
 
 def read_pair_values_file(file_path: str) -> dict:
-    """
-    Read file of the form:
+    '''Read file of the form:
 
     >Family
     pdbid1_pdbid2
-    value1 value2 value3 ...
-
-    Returns:
-
-    {
-        ('pdbid1', 'pdbid2'): [value1, value2, ...],
-        ...
-    }
-    """
+    value1 value2 value3 ...'''
 
     values_by_pair = {}
 
     with open(file_path, 'r', encoding='utf-8') as file:
-        lines = [
-            line.strip()
-            for line in file
-            if line.strip()
-        ]
+        lines = [line.strip() for line in file if line.strip()]
 
     i = 0
 
@@ -369,22 +447,12 @@ def read_pair_values_file(file_path: str) -> dict:
         pair_name = lines[i]
 
         if i + 1 >= len(lines):
-            raise ValueError(
-                f'No values found for pair {pair_name}'
-            )
+            raise ValueError(f'No values found for pair {pair_name}')
 
-        values = [
-            float(x)
-            for x in lines[i + 1].split()
-        ]
+        values = [float(x) for x in lines[i + 1].split()]
 
         pdbid_1, pdbid_2 = pair_name.split('_', 1)
-
-        pair_key = normalize_pair(
-            pdbid_1,
-            pdbid_2
-        )
-
+        pair_key = normalize_pair(pdbid_1, pdbid_2)
         values_by_pair[pair_key] = values
 
         i += 2
@@ -445,48 +513,53 @@ def find_mismatches(aligned_chain_1: str, aligned_chain_2: str) -> str:
     return mismatches
 
 
-families = read_families('amyloid_explorer_families.txt')
+def read_seqres_flexibilities(pdb_id: str, flexibility_file: str) -> list:
+    '''Read pre-calculated flexibility values for a PDB ID from a file.'''
 
-lddt_data = read_pair_values_file('lddts.txt')
-rmsd_data = read_pair_values_file('rmsds.txt')
+    with open(flexibility_file, 'r') as file:
+        lines = file.readlines()
+
+    for i, line in enumerate(lines):
+        if line.strip() == f'>{pdb_id}':
+            if i + 1 >= len(lines):
+                raise ValueError(
+                    f'No flexibility values found for {pdb_id}'
+                )
+
+            return [float(x) for x in lines[i + 1].split()]
+
+    raise ValueError(
+        f'Flexibility values not found for {pdb_id}'
+    )
+
+
+families = read_families('clusters_renamed.txt')
+
+lddt_data = read_pair_values_file('lddts_9_new.txt')
+rmsd_data = read_pair_values_file('rmsds_9_new.txt')
 
 verbose = False
 
-OUTPUT_DIR = Path('idr_lddt_rmsd_graphics')
-OUTPUT_DIR.mkdir(exist_ok=True)
+output_dir = Path('flex_idr_lddt_rmsd_graphics')
+output_dir.mkdir(exist_ok=True)
 
-for family_number, (family_name, pdb_ids) in enumerate(
-    families.items(),
-    start=1
-):
+for family_number, (family_name, pdb_ids) in enumerate(families.items(), start=1):
 
     print()
     print('=' * 80)
-    print(
-        f'[{family_number}/{len(families)}] {family_name}'
-    )
-    print(
-        f'Structures: {len(pdb_ids)}'
-    )
+    print(f'[{family_number}/{len(families)}] {family_name}')
+    print(f'Structures: {len(pdb_ids)}')
     print('=' * 80)
-
-    # --------------------------------------------------------
-    # Arrays for current family
-    # --------------------------------------------------------
 
     rmsd_length_6 = []
     lddt_length_6 = []
     idr_length_6 = []
-
-    # --------------------------------------------------------
-    # All unique pairs in this family
-    # --------------------------------------------------------
+    flexibility_length_9 = []
 
     total_pairs = len(pdb_ids) * (len(pdb_ids) - 1) // 2
     pair_counter = 0
 
     for pdbid_1 in pdb_ids:
-
         for pdbid_2 in pdb_ids:
 
             if pdbid_1 >= pdbid_2:
@@ -494,63 +567,30 @@ for family_number, (family_name, pdb_ids) in enumerate(
 
             pair_counter += 1
 
-            print(
-                f'[{pair_counter}/{total_pairs}] '
-                f'{pdbid_1} / {pdbid_2}'
-            )
+            print(f'[{pair_counter}/{total_pairs}] '
+                  f'{pdbid_1} / {pdbid_2}')
 
-            # ------------------------------------------------
-            # Get precalculated LDDT and RMSD
-            # ------------------------------------------------
-
-            pair_key = normalize_pair(
-                pdbid_1,
-                pdbid_2
-            )
+            pair_key = normalize_pair(pdbid_1, pdbid_2)
 
             if pair_key not in lddt_data:
-                print(
-                    f'  WARNING: LDDT not found for '
-                    f'{pdbid_1} / {pdbid_2}'
-                )
+                print(f'  WARNING: LDDT not found for '
+                      f'{pdbid_1} / {pdbid_2}')
                 continue
 
             if pair_key not in rmsd_data:
-                print(
-                    f'  WARNING: RMSD not found for '
-                    f'{pdbid_1} / {pdbid_2}'
-                )
+                print(f'  WARNING: RMSD not found for '
+                      f'{pdbid_1} / {pdbid_2}')
                 continue
 
             pair_lddt = lddt_data[pair_key]
             pair_rmsd = rmsd_data[pair_key]
 
-            # ------------------------------------------------
-            # Alignment
-            # ------------------------------------------------
+            results = process_pair(pdbid_1, pdbid_2)
+            aligned_chain_1, aligned_chain_2 = strip_alignment(results['chain_alignment'][0], results['chain_alignment'][1])
+            len_longest_shared_region = get_len_longest_shared_region(aligned_chain_1, aligned_chain_2)
 
-            results = process_pair(
-                pdbid_1,
-                pdbid_2
-            )
-
-            aligned_chain_1, aligned_chain_2 = strip_alignment(
-                results['chain_alignment'][0],
-                results['chain_alignment'][1]
-            )
-
-            len_longest_shared_region = \
-                get_len_longest_shared_region(
-                    aligned_chain_1,
-                    aligned_chain_2
-                )
-
-            if len_longest_shared_region < 7:
+            if len_longest_shared_region < 10:
                 continue
-
-            # ------------------------------------------------
-            # Verbose output
-            # ------------------------------------------------
 
             if verbose:
 
@@ -577,328 +617,165 @@ for family_number, (family_name, pdb_ids) in enumerate(
             print()
             print(aligned_chain_1)
             print(aligned_chain_2)
-            print(
-                find_mismatches(
-                    aligned_chain_1,
-                    aligned_chain_2
-                )
-            )
+            print(find_mismatches(aligned_chain_1, aligned_chain_2))
             print()
-
-            # ------------------------------------------------
-            # Coordinates
-            # ------------------------------------------------
 
             positions_1 = get_positions(pdbid_1)
             positions_2 = get_positions(pdbid_2)
-
-            # ------------------------------------------------
-            # Shared windows
-            # ------------------------------------------------
 
             (
                 aa_regions_1,
                 pos_regions_1,
                 aa_regions_2,
-                pos_regions_2
+                pos_regions_2,
+                seqres_windows_1,
+                seqres_windows_2
             ) = get_shared_regions(
-                6,
+                9,
                 aligned_chain_1,
                 aligned_chain_2,
                 positions_1,
-                positions_2
+                positions_2,
+                results['seqres_to_common'][0],
+                results['seqres_to_common'][1]
             )
 
-            # ------------------------------------------------
-            # Check number of windows
-            # ------------------------------------------------
-
             if len(pair_lddt) != len(pos_regions_1):
-
-                print(
-                    f'WARNING: LDDT/window mismatch: '
-                    f'{len(pair_lddt)} vs '
-                    f'{len(pos_regions_1)}'
-                )
-
+                print(f'WARNING: LDDT/window mismatch: '
+                      f'{len(pair_lddt)} vs '
+                      f'{len(pos_regions_1)}')
+                print(pair_lddt)
                 continue
 
             if len(pair_rmsd) != len(pos_regions_1):
-
-                print(
-                    f'WARNING: RMSD/window mismatch: '
-                    f'{len(pair_rmsd)} vs '
-                    f'{len(pos_regions_1)}'
-                )
-
+                print(f'WARNING: RMSD/window mismatch: '
+                      f'{len(pair_rmsd)} vs '
+                      f'{len(pos_regions_1)}')
                 continue
 
-            # ------------------------------------------------
-            # IDR
-            # ------------------------------------------------
+            seqres_idr_1 = read_seqres_idr(pdbid_1, 'idrs.txt')
+            seqres_idr_2 = read_seqres_idr(pdbid_2, 'idrs.txt')
 
-            seqres_idr_1 = read_seqres_idr(
+            chain_idr_1 = select_atomseq_idr(results['chain_1'][0], results['chain_1'][1], seqres_idr_1)
+            chain_idr_2 = select_atomseq_idr(results['chain_2'][0], results['chain_2'][1], seqres_idr_2)
+
+            idr_by_position_1 = dict(zip(positions_1, chain_idr_1))
+            idr_by_position_2 = dict(zip(positions_2, chain_idr_2))
+
+            flex_1 = read_seqres_flexibilities(
                 pdbid_1,
-                'Ps.txt'#'idrs.txt'
+                'flexibilities.txt'
             )
 
-            seqres_idr_2 = read_seqres_idr(
+            flex_2 = read_seqres_flexibilities(
                 pdbid_2,
-                'Ps.txt'#'idrs.txt'
+                'flexibilities.txt'
             )
 
-            chain_idr_1 = select_atomseq_idr(
-                results['chain_1'][0],
-                results['chain_1'][1],
-                seqres_idr_1
-            )
+            for r in range(len(pos_regions_1)):
 
-            chain_idr_2 = select_atomseq_idr(
-                results['chain_2'][0],
-                results['chain_2'][1],
-                seqres_idr_2
-            )
-
-            idr_by_position_1 = dict(
-                zip(
-                    positions_1,
-                    chain_idr_1
-                )
-            )
-
-            idr_by_position_2 = dict(
-                zip(
-                    positions_2,
-                    chain_idr_2
-                )
-            )
-
-            # ------------------------------------------------
-            # Process windows
-            # ------------------------------------------------
-
-            for r in range(
-                len(pos_regions_1)
-            ):
-
-                # --------------------------------------------
-                # RMSD from file
-                # --------------------------------------------
-
-                rmsd_length_6.append(
-                    pair_rmsd[r]
-                )
-
-                # --------------------------------------------
-                # LDDT from file
-                # --------------------------------------------
-
-                lddt_length_6.append(
-                    1 - pair_lddt[r]
-                )
-
-                # --------------------------------------------
-                # IDR
-                # --------------------------------------------
-
+                rmsd_length_6.append(pair_rmsd[r])
+                lddt_length_6.append(1 - pair_lddt[r])
                 window_pair_idr = []
 
-                for pos_1, pos_2 in zip(
-                    pos_regions_1[r],
-                    pos_regions_2[r]
-                ):
+                for pos_1, pos_2 in zip(pos_regions_1[r], pos_regions_2[r]):
 
                     idr_1 = idr_by_position_1[pos_1]
                     idr_2 = idr_by_position_2[pos_2]
 
-                    mean_idr_residue = idr_1 + idr_2#(
-                        #idr_1 + idr_2
-                    #) / 2
+                    mean_idr_residue = (idr_1 + idr_2) / 2
+                    window_pair_idr.append(mean_idr_residue)
 
-                    window_pair_idr.append(
-                        mean_idr_residue
-                    )
+                mean_idr_window = np.mean(window_pair_idr)
+                idr_length_6.append(mean_idr_window)
 
-                mean_idr_window = round(sum(window_pair_idr))#np.mean(
-                    #window_pair_idr
-                #)
+                seqres_window_1 = seqres_windows_1[r]
+                seqres_window_2 = seqres_windows_2[r]
 
-                idr_length_6.append(
-                    mean_idr_window
-                )
+                flex_window_1 = flex_1[seqres_window_1[0]]
+                flex_window_2 = flex_2[seqres_window_2[0]]
 
-    # ========================================================
-    # PLOTS FOR CURRENT FAMILY
-    # ========================================================
+                mean_flexibility = (
+                    flex_window_1 +
+                    flex_window_2
+                ) / 2
+
+                flexibility_length_9.append(mean_flexibility)
+
+            
 
     if len(idr_length_6) < 2:
-
-        print(
-            'Not enough data to build graphs.'
-        )
-
+        print('Not enough data to build graphs.')
         continue
 
-    # --------------------------------------------------------
-    # Family filename
-    # --------------------------------------------------------
+    safe_family_name = ''.join(c if c.isalnum() or c in '-_.' else '_' for c in family_name)
 
-    safe_family_name = ''.join(
-        c if c.isalnum() or c in '-_.'
-        else '_'
-        for c in family_name
-    )
+    """# IDR vs LDDT
+    slope, intercept, r, p, se = linregress(idr_length_6, lddt_length_6)
+    idr_range = np.arange(min(idr_length_6), max(idr_length_6), 0.01)
 
-    # ========================================================
-    # IDR vs LDDT
-    # ========================================================
-
-    if len(set(idr_length_6)) > 1:
-        slope, intercept, r, p, se = linregress(
-            idr_length_6,
-            lddt_length_6
-        )
-
-        idr_range = np.arange(
-            min(idr_length_6),
-            max(idr_length_6),
-            0.01
-        )
-
-        plot.plot(
-            idr_range,
-            intercept + slope * idr_range,
-            color='#450920'
-        )
-
-    figure = plot.figure(
-        figsize=(8, 6)
-    )
-
-    #plot.scatter(
-    #    np.array(idr_length_6, dtype=float) + np.random.uniform(-0.02, +0.02, size=len(idr_length_6)),
-    #    lddt_length_6,
-    #    color='#a53860',
-    #    alpha=0.1
-    #)
-
-    x, y = idr_length_6, lddt_length_6
-
-    # Group y values by x
-    groups = defaultdict(list)
-    for xi, yi in zip(x, y):
-        groups[xi].append(yi)
-
-    # Sort x values and build boxplot data in that order
-    xs = sorted(groups)
-    data = [groups[xi] for xi in xs]
-
-    plot.boxplot(data, positions=range(len(xs)))
-    plot.xticks(range(len(xs)))
-    #plot.xticklabels(xs)
-
+    figure = plot.figure(figsize=(8, 6))
+    plot.plot(idr_range, intercept + slope * idr_range, color='#450920')
+    plot.scatter(idr_length_6, lddt_length_6, color='#a53860', alpha=0.1)
     plot.xticks(fontsize=12)
     plot.yticks(fontsize=12)
-
-    plot.xlabel(
-        'Number of glycines',#'IDR',
-        fontsize=16
-    )
-
-    plot.ylabel(
-        '1 – LDDT',
-        fontsize=16
-    )
-
-    plot.title(
-        f'{family_name} family screened using window of length 6',
-        fontsize=16
-    )
+    plot.xlabel('IDR', fontsize=16)
+    plot.ylabel('1 – LDDT', fontsize=16)
+    plot.title(f'{family_name} family screened using window of length 6', fontsize=16)
 
     plot.tight_layout()
-
-    plot.savefig(
-        OUTPUT_DIR / f'{safe_family_name}_idr_lddt.png',
-        dpi=300
-    )
-
+    plot.savefig(output_dir / f'{safe_family_name}_idr_lddt.png', dpi=300)
     plot.close(figure)
 
-    # ========================================================
     # IDR vs RMSD
-    # ========================================================
+    slope, intercept, r, p, se = linregress(idr_length_6, rmsd_length_6)
+    idr_range = np.arange(min(idr_length_6), max(idr_length_6), 0.01)
 
-    if len(set(idr_length_6)) > 1:
-        slope, intercept, r, p, se = linregress(
-            idr_length_6,
-            rmsd_length_6
-        )
-
-        idr_range = np.arange(
-            min(idr_length_6),
-            max(idr_length_6),
-            0.01
-        )
-
-        plot.plot(
-            idr_range,
-            intercept + slope * idr_range,
-            color='#450920'
-        )
-
-    figure = plot.figure(
-        figsize=(8, 6)
-    )
-
-    #plot.scatter(
-    #    np.array(idr_length_6, dtype=float) + np.random.uniform(-0.02, +0.02, size=len(idr_length_6)),
-    #    rmsd_length_6,
-    #    color='#a53860',
-    #    alpha=0.1
-    #)
-
-    x, y = idr_length_6, rmsd_length_6
-
-    # Group y values by x
-    groups = defaultdict(list)
-    for xi, yi in zip(x, y):
-        groups[xi].append(yi)
-
-    # Sort x values and build boxplot data in that order
-    xs = sorted(groups)
-    data = [groups[xi] for xi in xs]
-
-    plot.boxplot(data, positions=range(len(xs)))
-    plot.xticks(range(len(xs)))
-    #plot.xticklabels(xs)
-
+    figure = plot.figure(figsize=(8, 6))
+    plot.plot(idr_range, intercept + slope * idr_range, color='#450920')
+    plot.scatter(idr_length_6, rmsd_length_6, color='#a53860', alpha=0.1)
     plot.xticks(fontsize=12)
     plot.yticks(fontsize=12)
-
-    plot.xlabel(
-        'Number of glycines',#'IDR',
-        fontsize=16
-    )
-
-    plot.ylabel(
-        'RMSD',
-        fontsize=16
-    )
-
-    plot.title(
-        f'{family_name} family screened using window of length 6',
-        fontsize=16
-    )
+    plot.xlabel('IDR', fontsize=16)
+    plot.ylabel('RMSD', fontsize=16)
+    plot.title(f'{family_name} family screened using window of length 6', fontsize=16)
 
     plot.tight_layout()
-
-    plot.savefig(
-        OUTPUT_DIR / f'{safe_family_name}_idr_rmsd.png',
-        dpi=300
-    )
-
+    plot.savefig(output_dir / f'{safe_family_name}_idr_rmsd.png', dpi=300)
     plot.close(figure)
 
-    print(
-        f'Saved graphs for {family_name}'
-    )
+    print(f'Saved graphs for {family_name}')"""
+
+    # flexibility vs LDDT
+    slope, intercept, r, p, se = linregress(flexibility_length_9, lddt_length_6)
+    flex_range = np.arange(min(flexibility_length_9), max(flexibility_length_9), 0.01)
+
+    figure = plot.figure(figsize=(8, 6))
+    plot.plot(flex_range, intercept + slope * flex_range, color='#450920')
+    plot.scatter(flexibility_length_9, lddt_length_6, color='#a53860', alpha=0.1)
+    plot.xticks(fontsize=12)
+    plot.yticks(fontsize=12)
+    plot.xlabel('Flexibility', fontsize=16)
+    plot.ylabel('1 – LDDT', fontsize=16)
+    plot.title(f'{family_name} family screened using window of length 9', fontsize=16)
+
+    plot.tight_layout()
+    plot.savefig(output_dir / f'{safe_family_name}_flex_lddt.png', dpi=300)
+    plot.close(figure)
+
+    # flexibility vs RMSD
+    slope, intercept, r, p, se = linregress(flexibility_length_9, rmsd_length_6)
+    flex_range = np.arange(min(flexibility_length_9), max(flexibility_length_9), 0.01)
+
+    figure = plot.figure(figsize=(8, 6))
+    plot.plot(flex_range, intercept + slope * flex_range, color='#450920')
+    plot.scatter(flexibility_length_9, rmsd_length_6, color='#a53860', alpha=0.1)
+    plot.xticks(fontsize=12)
+    plot.yticks(fontsize=12)
+    plot.xlabel('Flexibility', fontsize=16)
+    plot.ylabel('RMSD', fontsize=16)
+    plot.title(f'{family_name} family screened using window of length 9', fontsize=16)
+
+    plot.tight_layout()
+    plot.savefig(output_dir / f'{safe_family_name}_flex_rmsd.png', dpi=300)
+    plot.close(figure)
