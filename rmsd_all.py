@@ -8,7 +8,7 @@ from Bio.Align import PairwiseAligner
 
 input_folder = Path('extracted_chains')
 families_file = Path('clusters_renamed.txt')
-output_file = Path('rmsds.txt')
+output_file = Path('rmsds_9_new.txt')
 
 
 def read_seq(seq_file_path: str) -> str:
@@ -269,7 +269,7 @@ def get_shared_regions(w: int, aligned_chain_1: str, aligned_chain_2: str,
 
     aa_regions_1, pos_regions_1, aa_regions_2, pos_regions_2 = [], [], [], []
 
-    for i in range(6, N - w + 1 - 6):
+    for i in range(9, N - w + 1 - 9):
         if aligned_chain_1[i] != '-':
             i_1 += 1
 
@@ -402,10 +402,10 @@ def main():
 
                     longest_shared_region = (get_len_longest_shared_region(aligned_chain_1, aligned_chain_2))
 
-                    if longest_shared_region < 7:
+                    if longest_shared_region < 10:
                         continue
 
-                    aa_regions_1, pos_regions_1, aa_regions_2, pos_regions_2 = get_shared_regions(6,
+                    aa_regions_1, pos_regions_1, aa_regions_2, pos_regions_2 = get_shared_regions(9,
                                                                                                     aligned_chain_1,
                                                                                                     aligned_chain_2,
                                                                                                     positions[pdbid_1],

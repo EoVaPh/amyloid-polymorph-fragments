@@ -2,12 +2,10 @@ import os
 import re
 import warnings
 from Bio import BiopythonWarning
-from Bio.PDB import PDBParser, MMCIFParser
+from Bio.PDB import MMCIFParser
 from Bio.SeqUtils import seq1
-from Bio.SeqIO.PdbIO import PdbSeqresIterator, CifSeqresIterator
-from Bio import SeqIO
-from Bio.Data import PDBData
 from Bio.PDB.MMCIF2Dict import MMCIF2Dict
+from Bio.SeqUtils import seq1
 from Bio.PDB.Residue import DisorderedResidue
 
 
@@ -30,6 +28,11 @@ def _residue_number_string(residue):
     if ins_code and ins_code.strip():
         return base + ins_code.strip()
     return base
+
+
+import os
+from Bio import SeqIO
+from Bio.Data import PDBData
 
 
 def get_seqres(path, chain_id):
@@ -192,7 +195,7 @@ def extract_longest_chain_to_files(input_dir, output_dir):
         #try:
         seq = get_seqres(path, chain_id_display)
 
-        #seq_filename = f"{stem}_{ext_lower.lstrip('.')}_{chain_id_safe}_seq.txt"
+            #seq_filename = f"{stem}_{ext_lower.lstrip('.')}_{chain_id_safe}_seq.txt"
         seq_filename = f"{stem}_seq.txt"
         seq_path = os.path.join(output_dir, seq_filename)
         seq_file = open(seq_path, 'w')

@@ -4,8 +4,8 @@ from io import StringIO
 from Bio import SeqIO
  
 mafft = Path(r"C:\Users\User\Documents\bioinf\smtb\MAFFT\mafft-win\mafft.bat")
-input_folder = Path("clusters_seqres")
-output_folder = Path("MAFFT_clusters_final")
+input_folder = Path("clusters_chains")
+output_folder = Path("MAFFT_clusters_chains_final")
 output_folder.mkdir(parents=True, exist_ok=True)
 
 for fasta_file in input_folder.glob("*.fasta"):

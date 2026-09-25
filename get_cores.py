@@ -140,15 +140,15 @@ def find_core(alignment, threshold=0.875):
     return list(range(best_start, best_end + 1))
 
 
-alignment_folder = Path('MAFFT_seqres_from_cifs_multiple_alignment')
+alignment_folder = Path('MAFFT_clusters_chains_final')
 alignment_files = sorted(alignment_folder.rglob("*.txt"))
-output_file = Path("cores.txt")
+output_file = Path("clusters_chain_cores.txt")
 count = 0
 
 with open(output_file, "w", encoding="utf-8") as out:
     for alignment_file in alignment_files:
         alignment = read_alignment(alignment_file)
-        core_positions = find_core(alignment, threshold=0.93)
+        core_positions = find_core(alignment, threshold=0.865)
 
         if not core_positions:
             print(f"{alignment_file.name}: core not found")

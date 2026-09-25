@@ -1,4 +1,4 @@
-# Download structures using entries from Amyloid Atlas.
+""" # Download structures using entries from Amyloid Atlas.
 
 import urllib.request
 import re
@@ -15,23 +15,14 @@ amyloid_atlas_file.close()
 fibril_pdbs = []
 
 for line in lines:
-    match = None
+    match = re.search(r'https://www\\.rcsb\\.org/structure/([A-Za-z0-9]{4})', line)
 
-    try:
-        match = re.search(
-            r'<a\s+href="https://www\.rcsb\.org/structure/([A-Za-z0-9]+)"',
-            line
-        ).group(1)
-    except:
-        continue
-
-    fibril_pdbs.append(match.strip())
+    if match:
+        fibril_pdbs.append(match.group(1).lower())
 
 cnt = 0
 
 os.makedirs('CIFs', exist_ok=True)
-
-print(len(fibril_pdbs), 'entries in Amyloid Atlas found.')
 
 for pdb in fibril_pdbs:
     cif_path = os.path.join('CIFs', pdb + '.cif')
@@ -100,8 +91,8 @@ for pdb in AmyloidExplorer_pdbs:
     if not cif_exists:
         miss_pdbs.append(pdb)
 
-print('Missed structure files from Amyloid Explorer:', miss_pdbs)
-
+print(miss_pdbs)
+ """
 
 import os
 import urllib.request
