@@ -1,64 +1,71 @@
-""" # Download structures using entries from Amyloid Atlas.
+# Download structures using entries from Amyloid Atlas.
 
 import urllib.request
 import re
 import os
 
 # Sawaya, Michael R., et al.
-# "The expanding amyloid family: Structure, stability, function, and pathogenesis."
+# "The expanding amyloid family:
+# Structure, stability, function, and pathogenesis."
 # Cell 184.19 (2021): 4857-4873.
-amyloid_atlas_file = open('DBs/Amyloid Atlas 2026.html', 'r',
-                          errors='ignore')
-lines = amyloid_atlas_file.readlines()
+amyloid_atlas_file = open('DBs/Amyloid Atlas 2026.html', 'r', errors='ignore')
+amyloid_atlas_lines = amyloid_atlas_file.readlines()
 amyloid_atlas_file.close()
 
-fibril_pdbs = []
+amyloid_atlas_ids = []
 
-for line in lines:
-    match = re.search(r'https://www\\.rcsb\\.org/structure/([A-Za-z0-9]{4})', line)
+for line in amyloid_atlas_lines:
+    match = None
 
-    if match:
-        fibril_pdbs.append(match.group(1).lower())
+    try:
+        match = re.search(
+            r'<a\s+href="https://www\.rcsb\.org/structure/([A-Za-z0-9]+)"',
+            line
+        ).group(1)
+    except:
+        continue
+
+    amyloid_atlas_ids.append(match.strip())
 
 cnt = 0
 
 os.makedirs('CIFs', exist_ok=True)
 
-for pdb in fibril_pdbs:
-    cif_path = os.path.join('CIFs', pdb + '.cif')
-    pdb_path = os.path.join('CIFs', pdb + '.pdb')
+print(len(amyloid_atlas_ids), 'entries in Amyloid Atlas found.')
+
+for id in amyloid_atlas_ids:
+    cif_path = os.path.join('CIFs', id + '.cif')
+    pdb_path = os.path.join('CIFs', id + '.pdb')
 
     if os.path.exists(cif_path):
-        print(f'{pdb}: CIF already exists')
+        print(f'{id}: CIF already exists')
         cnt += 1
         print(cnt)
         continue
 
     try:
         urllib.request.urlretrieve(
-            'http://files.rcsb.org/download/' + pdb + '.cif',
-            'CIFs/' + pdb + '.cif'
+            'http://files.rcsb.org/download/' + id + '.cif',
+            'CIFs/' + id + '.cif'
         )
 
+        # Remove structure in PDB format.
         if os.path.exists(pdb_path):
             os.remove(pdb_path)
-            print(f'{pdb}: old PDB removed')
-
+            print(f'{id}: old PDB removed')
     except Exception:
-        print('Failed to download ' + pdb + ' in mmCIF format.')
+        print('Failed to download ' + id + ' in mmCIF format.')
 
         try:
-
             urllib.request.urlretrieve(
-                f'https://files.rcsb.org/download/{pdb}.pdb',
+                f'https://files.rcsb.org/download/{id}.pdb',
                 pdb_path
             )
 
-            print(f'{pdb}: PDB downloaded')
+            print(f'{id}: PDB downloaded')
 
         except Exception:
-            print(f'{pdb}: neither CIF nor PDB is available')
-
+            print(f'{id}: neither CIF nor PDB is available')
 
     cnt += 1
     print(cnt)
@@ -69,7 +76,7 @@ for pdb in fibril_pdbs:
 # "Amyloid Explorer: a global atlas of amyloid fibril structures and thermodynamic principles."
 # bioRxiv (2025): 2025-10.
 AmyloidExplorer_file = open('DBs/Amyloid Explorer.html', 'r')
-text = AmyloidExplorer_file.read()
+amyloid_explorer_text = AmyloidExplorer_file.read()
 AmyloidExplorer_file.close()
 
 # Check which structures are still missing in the pool directory.
@@ -77,7 +84,7 @@ substring = 'strct='
 num_chars = 4
 pattern = rf"{re.escape(substring)}(.{{{num_chars}}})"
 
-AmyloidExplorer_pdbs = re.findall(pattern, text)
+AmyloidExplorer_pdbs = re.findall(pattern, amyloid_explorer_text)
 
 path = 'CIFs'
 pdbs = os.listdir(path)
@@ -91,13 +98,11 @@ for pdb in AmyloidExplorer_pdbs:
     if not cif_exists:
         miss_pdbs.append(pdb)
 
-print(miss_pdbs)
- """
+print('Missed structure files from Amyloid Explorer:', miss_pdbs)
 
 import os
 import urllib.request
 import json
-
 
 url = (
     'https://ff54g8ykd7.execute-api.eu-central-1.amazonaws.com'
