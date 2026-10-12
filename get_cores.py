@@ -4,6 +4,11 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 
 
+alignment_folder = Path('MAFFT_clusters_chains_final')
+alignment_files = sorted(alignment_folder.rglob("*.txt"))
+output_file = Path("clusters_chain_cores.txt")
+
+
 def read_alignment(filename: Path) -> list:
     '''Read alignment in format:
 
@@ -85,7 +90,7 @@ def make_residue_mapping(sequence, structure_angles):
     return mapping
 
 
-def find_core(alignment, threshold=0.875):
+def find_core(alignment, threshold=0.865):
     '''Find the longest continuous alignment region where
     at least `threshold` of sequences contain a residue.
 
@@ -140,9 +145,6 @@ def find_core(alignment, threshold=0.875):
     return list(range(best_start, best_end + 1))
 
 
-alignment_folder = Path('MAFFT_clusters_chains_final')
-alignment_files = sorted(alignment_folder.rglob("*.txt"))
-output_file = Path("clusters_chain_cores.txt")
 count = 0
 
 with open(output_file, "w", encoding="utf-8") as out:
@@ -155,10 +157,24 @@ with open(output_file, "w", encoding="utf-8") as out:
             count += 1
             continue
 
-        # Take the sequence of the first structure
-        # to represent the core.
-        reference_sequence = alignment[0][1]
-        core = "".join(reference_sequence[position] for position in core_positions)
+        
+        # Select the most frequent amino acid at each core position.
+        core_residues = []
+
+        for position in core_positions:
+            residues = [sequence[position] for _, sequence in alignment if sequence[position] != "-"]
+            if not residues:
+                continue
+
+            # Count amino acids and select the most frequent one.
+            counts = {}
+            for aa in residues:
+                counts[aa] = counts.get(aa, 0) + 1
+
+            most_common_aa = max(counts, key=counts.get)
+            core_residues.append(most_common_aa)
+
+        core = "".join(core_residues)
 
         family_name = alignment_file.stem
 

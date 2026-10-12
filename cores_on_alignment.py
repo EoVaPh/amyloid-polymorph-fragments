@@ -15,7 +15,7 @@ output_folder = Path("cores_on_alignment")
 output_folder.mkdir(exist_ok=True)
 
 
-def find_core(alignment, threshold=0.875):
+def find_core(alignment, threshold=0.865):
     '''Find the longest continuous alignment region where
     at least `threshold` of sequences contain a residue.
 
@@ -107,12 +107,20 @@ def plot_alignment(alignment, core_sequence, output_file):
            for _, sequence in alignment):
         raise ValueError("Sequences have different alignment lengths.")
 
-    core_positions = set(find_core(alignment, 0.875))
+    core_positions = find_core(alignment, 0.865)
 
     fig, ax = plt.subplots(
         figsize=(16, max(3, len(alignment) * 0.28))
     )
 
+    aa_colors = {"A": "#FFD92F", "V": "#FFD92F", "I": "#FFD92F", "L": "#FFD92F", "M": "#FFD92F",
+                 "K": "#D7191C", "R": "#D7191C",
+                 "D": "#2C7BB6", "E": "#2C7BB6",
+                 "F": "#F28E2B", "W": "#F28E2B", "Y": "#F28E2B", "H": "#F28E2B",
+                 "S": "#2CA25F", "T": "#2CA25F", "N": "#2CA25F", "Q": "#2CA25F", "C": "#2CA25F",
+                 "G": "#9467BD",
+                 "P": "#8C564B"}
+    
     for row, (pdbid, sequence) in enumerate(alignment):
         y = len(alignment) - row - 1
 
@@ -129,7 +137,7 @@ def plot_alignment(alignment, core_sequence, output_file):
                 (position + 1, y)
             ])
 
-            colors.append("#D95F59" if in_core else "#555555")
+            colors.append(aa_colors.get(aa.upper(), "#D95F59") if in_core else "#555555")
             widths.append(0.7 if is_gap else 3.0)
 
         collection = LineCollection(
@@ -148,6 +156,7 @@ def plot_alignment(alignment, core_sequence, output_file):
             fontsize=8
         )
 
+
     for position, aa in zip(core_positions, core_sequence):
         ax.text(
             position + 0.5,
@@ -156,7 +165,7 @@ def plot_alignment(alignment, core_sequence, output_file):
             ha="center",
             va="bottom",
             fontsize=8,
-            color="#D95F59",
+            color=aa_colors.get(aa.upper(), "#D95F59"),
             fontweight="bold"
         )
 

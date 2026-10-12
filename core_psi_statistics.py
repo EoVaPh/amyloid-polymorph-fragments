@@ -232,7 +232,7 @@ def prepare_pca_data(turn_frequency):
         "T": 8.6, "V": 5.9, "W": 5.4, "Y": 6.2
     }
 
-    aromaticity = {aa: int(aa in "FWY") for aa in amino_acids}
+    aromaticity = {aa: int(aa in "FWYH") for aa in amino_acids}
     charge = {aa: 1 if aa in "KR" else -1 if aa in "DE" else 0 for aa in amino_acids}
 
     X = [[turn_frequency[aa], masses[aa], hydrophobicity[aa], aromaticity[aa], charge[aa], polarity[aa]] for aa in amino_acids]
